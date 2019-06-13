@@ -21,6 +21,7 @@ rand="*"
 structopt="*"
 serde = { version = "*", features = ["derive"] }
 bincode = "*"
+flame="*"
 
 [dependencies.mpi]
 git = "https://github.com/bsteinb/rsmpi.git"

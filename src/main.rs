@@ -6,11 +6,12 @@ use mpi_traffic::{
 };
 use piston_window::{color, Event, EventLoop, EventSettings, Loop, PistonWindow, WindowSettings};
 use structopt::StructOpt;
+use flame;
+use std::fs::File;
 
 fn main() {
     let settings = MpiTrafficOpt::from_args();
     env_logger::init();
-
     let mut window: PistonWindow = WindowSettings::new("MPI Traffic", [1000, 500])
         .exit_on_esc(true)
         .build()
@@ -23,7 +24,10 @@ fn main() {
         View::new(view_settings)
     };
 
+    flame::start("Model generation");
     let model = generate::generate_model(settings.model_generation_settings);
+    flame::end("Model generation");
+
     let stateless_model = model.stateless;
     let mut stateful_model = model.stateful;
     let mut controller = Controller::new();
@@ -31,6 +35,7 @@ fn main() {
     while let Some(e) = window.next() {
         trace!("event: {:?}", e);
         window.draw_2d(&e, |c, g, _| {
+            let _guard = flame::start_guard("View draw");
             use piston_window::clear;
             let clear_color = color::BLACK;
             clear(clear_color, g);
@@ -38,16 +43,19 @@ fn main() {
         });
         match e {
             Event::Input(e, _) => {
+                let _guard = flame::start_guard("Event Input handling");
                 controller.input(&mut stateful_model, &stateless_model, e);
-            },
+            }
             Event::Loop(e) => {
                 if let Loop::Update(args) = e {
+                    let _guard = flame::start_guard("Event Update handling");
                     controller.update(&mut stateful_model, &stateless_model, args);
                 }
-            },
-            _ => {},
+            }
+            _ => {}
         }
     }
+    flame::dump_html(&mut File::create("flame-graph.html").unwrap()).unwrap();
 }
 
 #[derive(StructOpt)]
