@@ -1,60 +1,175 @@
-use crate::model::board::Board;
-use crate::model::common::TurnRule;
-use crate::model::stateless::Car;
-use crate::model::stateless::City;
-use crate::model::stateless::Lane;
 use crate::model::stateless::Model;
-use crate::model::stateless::Road;
 
-pub mod intersection;
+use structopt::StructOpt;
 
-pub fn example() -> Result<Model, crate::Error> {
-    Ok(Model {
-        city: example_city()?,
-        cars: example_cars(),
-    })
+pub mod car;
+pub mod city;
+
+#[derive(Clone, Debug, StructOpt)]
+pub struct StatelessModelGenerationSettings {
+    #[structopt(
+        name = "stateless-model-generation-board-shape-rows",
+        default_value = "3",
+        long = "stateless-model-generation-board-shape-rows"
+    )]
+    pub board_shape_rows: usize,
+    #[structopt(
+        name = "stateless-model-generation-board-shape-cols",
+        default_value = "4",
+        long = "stateless-model-generation-board-shape-cols"
+    )]
+    pub board_shape_cols: usize,
+
+    #[structopt(
+        name = "stateless-model-generation-min-road-length",
+        default_value = "20",
+        long = "stateless-model-generation-min-road-length"
+    )]
+    pub min_road_length: f64,
+    #[structopt(
+        name = "stateless-model-generation-max-road-length",
+        default_value = "100",
+        long = "stateless-model-generation-max-road-length"
+    )]
+    pub max_road_length: f64,
+    #[structopt(
+        name = "stateless-model-generation-lane-width",
+        default_value = "3.5",
+        long = "stateless-model-generation-lane-width"
+    )]
+    pub lane_width: f64,
+    #[structopt(
+        name = "stateless-model-generation-initial-car-number",
+        default_value = "20",
+        long = "stateless-model-generation-initial-car-number"
+    )]
+    pub initial_car_number: usize,
+    #[structopt(
+        name = "stateless-model-generation-min-max-velocity",
+        default_value = "200.0",
+        long = "stateless-model-generation-min-max-velocity"
+    )]
+    pub min_max_velocity: f64,
+    #[structopt(
+        name = "stateless-model-generation-max-max-velocity",
+        default_value = "260.0",
+        long = "stateless-model-generation-max-max-velocity"
+    )]
+    pub max_max_velocity: f64,
+    #[structopt(
+        name = "stateless-model-generation-min-max-acceleration",
+        default_value = "30.0",
+        long = "stateless-model-generation-min-max-acceleration"
+    )]
+    min_max_acceleration: f64,
+    #[structopt(
+        name = "stateless-model-generation-max-max-acceleration",
+        default_value = "60.0",
+        long = "stateless-model-generation-max-max-acceleration"
+    )]
+    pub max_max_acceleration: f64,
+    #[structopt(
+        name = "stateless-model-generation-min-max-break-acceleration",
+        default_value = "20.0",
+        long = "stateless-model-generation-min-max-break-acceleration"
+    )]
+    pub min_max_break_acceleration: f64,
+    #[structopt(
+        name = "stateless-model-generation-max-max-break-acceleration",
+        default_value = "30.0",
+        long = "stateless-model-generation-max-max-break-acceleration"
+    )]
+    pub max_max_break_acceleration: f64,
+    #[structopt(
+        name = "stateless-model-generation-min-lane-change-time",
+        default_value = "15.0",
+        long = "stateless-model-generation-min-lane-change-time"
+    )]
+    pub min_lane_change_time: f64,
+    #[structopt(
+        name = "stateless-model-generation-max-lane-change-time",
+        default_value = "20.0",
+        long = "stateless-model-generation-max-lane-change-time"
+    )]
+    pub max_lane_change_time: f64,
+    #[structopt(
+        name = "stateless-model-generation-min-cushion",
+        default_value = "15.0",
+        long = "stateless-model-generation-min-cushion"
+    )]
+    pub min_cushion: f64,
+    #[structopt(
+        name = "stateless-model-generation-max-cushion",
+        default_value = "20.0",
+        long = "stateless-model-generation-max-cushion"
+    )]
+    pub max_cushion: f64,
+    #[structopt(
+        name = "stateless-model-generation-time-out",
+        default_value = "30.0",
+        long = "stateless-model-generation-time-out"
+    )]
+    pub time_out: f64,
+    #[structopt(
+        name = "stateless-model-generation-intersection-max-speed",
+        default_value = "20.0",
+        long = "stateless-model-generation-intersection-max-speed"
+    )]
+    pub intersection_max_speed: f64,
+    #[structopt(
+        name = "stateless-model-generation-lane-max-speed",
+        default_value = "60.0",
+        long = "stateless-model-generation-lane-max-speed"
+    )]
+    pub lane_max_speed: f64,
+    #[structopt(
+        name = "stateless-model-generation-straight-long-way-proportion",
+        default_value = "0.5",
+        long = "stateless-model-generation-straight-long-way-proportion"
+    )]
+    pub straight_long_way_proportion: f64,
+    #[structopt(
+        name = "stateless-model-generation-one-way-proportion",
+        default_value = "0.1",
+        long = "stateless-model-generation-one-way-proportion"
+    )]
+    pub one_way_proportion: f64,
+    #[structopt(
+        name = "stateless-model-generation-empty-proportion",
+        default_value = "0.05",
+        long = "stateless-model-generation-empty-proportion"
+    )]
+    pub empty_proportion: f64,
+    #[structopt(
+        name = "stateless-model-generation-one-way-lane-num",
+        default_value = "1",
+        long = "stateless-model-generation-one-way-lane-num"
+    )]
+    pub one_way_lane_num: usize,
+    #[structopt(
+        name = "stateless-model-generation-default-lane-num",
+        default_value = "1",
+        long = "stateless-model-generation-default-lane-num"
+    )]
+    pub default_lane_num: usize,
+    #[structopt(
+        name = "stateless-model-generation-straight-long-way-lane-num",
+        default_value = "2",
+        long = "stateless-model-generation-straight-long-way-lane-num"
+    )]
+    pub straight_long_way_lane_num: usize,
+
+    #[structopt(
+        name = "stateless-model-generation-car-out-min-distance",
+        default_value = "8",
+        long = "stateless-model-generation-car-out-min-distance"
+    )]
+    pub car_out_min_distance: f64,
 }
 
-pub fn example_city() -> Result<City, crate::Error> {
-    let mut board = Board::with_shape(None, None, (3, 3));
-    let max_speed = 60.0;
-    let lane = Lane {
-        max_speed,
-        direction_rule: TurnRule::ALL, // not properly set
-    };
-    let two_lane_road = Road {
-        lane_to_high: vec![lane.clone()],
-        lane_to_low: vec![lane.clone()],
-    };
-    let four_lane_road = Road {
-        lane_to_high: vec![lane.clone(), lane.clone()],
-        lane_to_low: vec![lane.clone(), lane.clone()],
-    };
-    // Create roads
-    board.horizontal_roads[(0, 0)] = Some(two_lane_road.clone());
-    board.horizontal_roads[(1, 0)] = Some(four_lane_road.clone());
-    board.horizontal_roads[(1, 1)] = Some(four_lane_road.clone());
-    board.horizontal_roads[(2, 1)] = Some(Road {
-        lane_to_high: vec![lane.clone()],
-        lane_to_low: Vec::new(),
-    });
-    board.vertical_roads[(0, 0)] = Some(two_lane_road.clone());
-    board.vertical_roads[(0, 1)] = Some(two_lane_road.clone());
-    board.vertical_roads[(0, 2)] = Some(two_lane_road.clone());
-    board.vertical_roads[(1, 1)] = Some(two_lane_road.clone());
-    board.vertical_roads[(1, 2)] = Some(two_lane_road.clone());
-
-    intersection::generate_from_roads(&mut board)?;
-    Ok(City {
-        board,
-        lane_width: 3.5, // National standard of city road
-        // All roads in the example city are 1 km long.
-        horizontal_road_length: vec![10000.0, 10000.0, 10000.0],
-        vertical_road_length: vec![10000.0, 10000.0, 10000.0],
-    })
-}
-
-pub fn example_cars() -> Vec<Car> {
-    // TODO: Create example cars
-    Vec::new()
+pub fn generate_stateless_model(settings: StatelessModelGenerationSettings) -> Model {
+    Model {
+        city: city::generate_city(&settings),
+        cars: car::generate_cars(&settings),
+    }
 }

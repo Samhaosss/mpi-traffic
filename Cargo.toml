@@ -17,6 +17,10 @@ log = "*"
 env_logger = "*"
 bitflags = "*"
 quick-error = "*"
+rand="*"
+structopt="*"
+serde = { version = "*", features = ["derive"] }
+bincode = "*"
 
 [dependencies.mpi]
 git = "https://github.com/bsteinb/rsmpi.git"

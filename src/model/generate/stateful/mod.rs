@@ -1,6 +1,11 @@
-use crate::model::stateful::Model;
-use crate::model::stateless;
+use crate::model::{stateful::Model, stateless};
 
-pub fn generate_from_stateless(_stateless_model: &stateless::Model) -> Model {
-    unimplemented!()
+pub mod city;
+
+pub fn generate_from_stateless(stateless_model: &stateless::Model) -> Model {
+    let car_number = stateless_model.cars.len();
+    Model {
+        city: city::generate_city_from_stateless(&stateless_model.city),
+        cars: vec![None; car_number],
+    }
 }
