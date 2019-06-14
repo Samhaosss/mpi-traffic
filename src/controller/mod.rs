@@ -9,7 +9,7 @@ use crate::{
             LaneDirection, LaneIndex, RelativeDirection, TurnRule,
         },
         stateful::{self, Car},
-        stateless,
+        stateless::{self, car::DrivingModel},
     },
 };
 use mpi::{collective::CommunicatorCollectives, topology::Rank};
@@ -189,18 +189,205 @@ impl UpdateController {
         args: UpdateArgs,
     ) -> Option<stateful::Car> {
         use crate::model::stateful::car::Location::*;
+        let stateless_car = &stateless.cars[car_index];
         if let Some(car) = &stateful.cars[car_index] {
             match &car.location {
                 OnLane {
-                    road_direction: _,
-                    road_index: _,
-                    lane_direction: _,
-                    lane_index: _,
-                    about_to_turn: _,
-                    position: _,
+                    road_direction,
+                    road_index,
+                    lane_direction,
+                    lane_index,
+                    about_to_turn,
+                    position,
                 } => {
-                    // get_front_car()
-                    unimplemented!()
+                    let road_length = stateless.city.road_length(*road_direction, *road_index);
+                    let road = stateless.city.board.get_roads(*road_direction)[*road_index]
+                        .as_ref()
+                        .unwrap();
+                    let lane = &road.lanes_to_direction(*lane_direction)[*lane_index];
+                    // let max_velocity = stateless_car.max_velocity.min(lane.max_speed);
+                    let max_velocity = stateless_car.max_velocity;
+                    let mut velocity =
+                        (car.velocity + car.acceleration * args.dt).min(max_velocity);
+                    if velocity < 0.0 {
+                        velocity = 0.0;
+                    }
+                    let position = position + car.velocity * args.dt;
+
+                    if position >= road_length {
+                        // switch to InIntersection
+                        let intersection_index = stateless.city.board.lane_to_intersection_index(
+                            *road_direction,
+                            *road_index,
+                            *lane_direction,
+                        );
+                        let driver_direction =
+                            AbsoluteDirection::of_lane(*road_direction, *lane_direction);
+                        let to_direction = driver_direction.turn(*about_to_turn);
+                        let from_direction = driver_direction.turn_back();
+                        let to_lane_index = {
+                            let mut rng = rand::thread_rng();
+                            let road_index = *stateless
+                                .city
+                                .board
+                                .context_of_intersection(intersection_index)
+                                .get(to_direction)
+                                .as_ref()
+                                .expect("no way to turn");
+                            let lane_direction = LaneDirection::absolute_in_out_to_lane(
+                                to_direction,
+                                InOutDirection::Out,
+                            );
+                            let road = stateless
+                                .city
+                                .board
+                                .get_road(to_direction.axis_direction(), road_index)
+                                .unwrap()
+                                .as_ref()
+                                .unwrap();
+                            let size = road.lanes_to_direction(lane_direction).len();
+                            rng.gen_range(0, size)
+                        };
+                        let total_length = stateless
+                            .city
+                            .intersection_path_total_length(
+                                intersection_index,
+                                from_direction,
+                                *lane_index,
+                                to_direction,
+                                to_lane_index,
+                            )
+                            .unwrap();
+                        let location = InIntersection {
+                            intersection_index,
+                            from_direction,
+                            from_lane_index: *lane_index,
+                            to_direction,
+                            to_lane_index,
+                            total_length,
+                            position: 0.0,
+                        };
+                        Some(Car {
+                            location,
+                            velocity: car.velocity,
+                            acceleration: 0.0,
+                        })
+                    } else {
+                        let mut front_objects = Vec::new();
+                        {
+                            let front_car_index = self.get_front_car(
+                                car_index,
+                                local_state,
+                                *road_direction,
+                                *road_index,
+                                *lane_direction,
+                                *lane_index,
+                            );
+                            if let Some(front_car_index) = front_car_index {
+                                let front_car = stateful.cars[front_car_index].as_ref().unwrap();
+                                let front_position = match &front_car.location {
+                                    OnLane { position, .. } => *position,
+                                    _ => unreachable!(),
+                                };
+                                let velocity = front_car.velocity;
+                                front_objects.push((front_position - position, velocity));
+                            }
+                        }
+                        {
+                            let intersection_index =
+                                stateless.city.board.lane_to_intersection_index(
+                                    *road_direction,
+                                    *road_index,
+                                    *lane_direction,
+                                );
+                            let stateful_intersection = stateful.city.board.intersections
+                                [intersection_index]
+                                .as_ref()
+                                .unwrap();
+                            let stateless_intersection = stateless.city.board.intersections
+                                [intersection_index]
+                                .as_ref()
+                                .unwrap();
+                            match stateless_intersection {
+                                stateless::Intersection::Crossroad { max_speed, .. } => {
+                                    match stateful_intersection {
+                                        stateful::Intersection::Crossroad { current, .. } => {
+                                            let from_direction = AbsoluteDirection::of_lane(
+                                                *road_direction,
+                                                *lane_direction,
+                                            )
+                                            .turn_back();
+                                            let turn_rule = *current.get(from_direction);
+                                            if about_to_turn.to_turn_rule().intersects(turn_rule) {
+                                                front_objects
+                                                    .push((road_length - position, *max_speed))
+                                            } else {
+                                                front_objects.push((road_length - position, 0.0))
+                                            }
+                                        },
+                                        _ => unreachable!(),
+                                    }
+                                },
+                                stateless::Intersection::TJunction { max_speed, .. } => {
+                                    match stateful_intersection {
+                                        stateful::Intersection::TJunction { current, .. } => {
+                                            // TODO: Fix redundant code
+                                            let from_direction = AbsoluteDirection::of_lane(
+                                                *road_direction,
+                                                *lane_direction,
+                                            )
+                                            .turn_back();
+                                            let turn_rule = *current.get(from_direction);
+                                            if about_to_turn.to_turn_rule().intersects(turn_rule) {
+                                                front_objects
+                                                    .push((road_length - position, *max_speed))
+                                            } else {
+                                                front_objects.push((road_length - position, 0.0))
+                                            }
+                                        },
+                                        _ => unreachable!(),
+                                    }
+                                },
+                                stateless::Intersection::Turn { max_speed } => {
+                                    front_objects.push((road_length - position, *max_speed))
+                                },
+                                stateless::Intersection::Straight => {
+                                    front_objects.push((road_length - position, lane.max_speed))
+                                },
+                                stateless::Intersection::End { max_speed } => {
+                                    front_objects.push((road_length - position, *max_speed))
+                                },
+                            }
+                        }
+                        let acceleration = front_objects
+                            .into_iter()
+                            .map(|(object_distance, object_velocity)| {
+                                Self::driver_acceleration(
+                                    car.velocity,
+                                    car.acceleration,
+                                    &stateless_car.driving_model,
+                                    object_distance,
+                                    object_velocity,
+                                )
+                            })
+                            .min_by(|a, b| a.partial_cmp(b).unwrap())
+                            .expect("car can not detect any object front");
+                        let acceleration = acceleration
+                            .min(stateless_car.max_acceleration)
+                            .max(-stateless_car.max_break_acceleration);
+                        Some(Car {
+                            velocity,
+                            acceleration,
+                            location: OnLane {
+                                road_direction: *road_direction,
+                                road_index: *road_index,
+                                lane_direction: *lane_direction,
+                                lane_index: *lane_index,
+                                about_to_turn: *about_to_turn,
+                                position,
+                            },
+                        })
+                    }
                 },
                 InIntersection {
                     intersection_index,
@@ -211,6 +398,26 @@ impl UpdateController {
                     total_length,
                     position,
                 } => {
+                    let stateless_intersection = stateless.city.board.intersections
+                        [*intersection_index]
+                        .as_ref()
+                        .unwrap();
+                    let intersection_max_speed = match stateless_intersection {
+                        stateless::Intersection::Crossroad { max_speed, .. } => Some(max_speed),
+                        stateless::Intersection::TJunction { max_speed, .. } => Some(max_speed),
+                        stateless::Intersection::Turn { max_speed } => Some(max_speed),
+                        stateless::Intersection::Straight => None,
+                        stateless::Intersection::End { max_speed } => Some(max_speed),
+                    };
+                    let proportion = position / total_length;
+                    let velocity = match intersection_max_speed {
+                        Some(max_speed) => {
+                            let velocity_proportion = proportion.min(0.5);
+                            car.velocity * (1.0 - velocity_proportion) +
+                                *max_speed * velocity_proportion
+                        },
+                        None => car.velocity,
+                    };
                     let position = position + car.velocity * args.dt;
                     if position >= *total_length {
                         let context = stateless
@@ -228,19 +435,25 @@ impl UpdateController {
                             .unwrap()
                             .lanes_to_direction(to_lane_direction)[*to_lane_index]
                             .direction_rule;
-                        let updated_car = OnLane {
-                            road_direction: to_direction.axis_direction(),
-                            road_index: out_road_index,
-                            lane_direction: to_lane_direction,
-                            lane_index: *to_lane_index,
-                            about_to_turn: self.random_choose_relative_direction(turn_rule),
-                            position: 0.0,
-                        };
-                        Some(Car {
-                            location: updated_car,
-                            velocity: car.velocity,
-                            acceleration: 0.0,
-                        })
+                        let about_to_turn = self.random_choose_relative_direction(turn_rule);
+                        match about_to_turn {
+                            Some(about_to_turn) => {
+                                let updated_car = OnLane {
+                                    road_direction: to_direction.axis_direction(),
+                                    road_index: out_road_index,
+                                    lane_direction: to_lane_direction,
+                                    lane_index: *to_lane_index,
+                                    about_to_turn,
+                                    position: 0.0,
+                                };
+                                Some(Car {
+                                    location: updated_car,
+                                    velocity,
+                                    acceleration: 0.0,
+                                })
+                            },
+                            None => None, // remove the car
+                        }
                     } else {
                         Some(Car {
                             location: InIntersection {
@@ -269,25 +482,51 @@ impl UpdateController {
                         .lanes_to_direction(lane_direction)[lane_index]
                         .direction_rule;
                     let about_to_turn = self.random_choose_relative_direction(turn_rule);
-                    let car = stateful::Car {
-                        location: stateful::car::Location::OnLane {
-                            road_direction,
-                            road_index,
-                            lane_direction,
-                            lane_index,
-                            position: 0.0,
-                            about_to_turn,
+                    match about_to_turn {
+                        Some(about_to_turn) => {
+                            let car = stateful::Car {
+                                location: stateful::car::Location::OnLane {
+                                    road_direction,
+                                    road_index,
+                                    lane_direction,
+                                    lane_index,
+                                    position: 0.0,
+                                    about_to_turn,
+                                },
+                                acceleration: 0.0,
+                                velocity: 0.0,
+                            };
+                            log::debug!("Crate new car: {:?}", car);
+                            Some(car)
                         },
-                        acceleration: 0.0,
-                        velocity: 0.0,
-                    };
-                    log::debug!("crate car: {:?}", car);
-                    Some(car)
+                        None => None,
+                    }
                 },
                 None => None,
             }
         } else {
             None
+        }
+    }
+
+    pub fn driver_acceleration(
+        velocity: f64,
+        _acceleration: f64,
+        driving_model: &DrivingModel,
+        front_distance: f64,
+        front_velocity: f64,
+    ) -> f64 {
+        match driving_model {
+            DrivingModel::Normal {
+                min_cushion,
+                cushion_velocity_factor,
+                prediction_time,
+            } => {
+                let aim_cushion = min_cushion + cushion_velocity_factor * front_velocity;
+                let dx = front_distance - aim_cushion; // if dx is greater than 0, the car should go faster than front_velocity
+                let aim_average_velocity = dx / *prediction_time;
+                (aim_average_velocity + front_velocity - velocity) * 2.0 / *prediction_time
+            },
         }
     }
 
@@ -312,7 +551,7 @@ impl UpdateController {
         None
     }
 
-    fn random_choose_relative_direction(&self, turn_rule: TurnRule) -> RelativeDirection {
+    fn random_choose_relative_direction(&self, turn_rule: TurnRule) -> Option<RelativeDirection> {
         use crate::model::common::RelativeDirection::*;
         let all_rule = [
             TurnRule::FRONT,
@@ -324,14 +563,19 @@ impl UpdateController {
             .iter()
             .filter(|&rule| (turn_rule & *rule) == *rule)
             .collect::<Vec<_>>();
-        let mut rng = rand::thread_rng();
-        let rule = enabled_rule[rng.gen_range(0usize, enabled_rule.len())];
-        match *rule {
-            TurnRule::FRONT => Front,
-            TurnRule::BACK => Back,
-            TurnRule::LEFT => Left,
-            TurnRule::RIGHT => Right,
-            _ => unreachable!(),
+        match enabled_rule.len() {
+            0 => None,
+            len => {
+                let mut rng = rand::thread_rng();
+                let rule = enabled_rule[rng.gen_range(0usize, len)];
+                Some(match *rule {
+                    TurnRule::FRONT => Front,
+                    TurnRule::BACK => Back,
+                    TurnRule::LEFT => Left,
+                    TurnRule::RIGHT => Right,
+                    _ => unreachable!(),
+                })
+            },
         }
     }
 

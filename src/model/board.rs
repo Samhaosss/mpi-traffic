@@ -1,5 +1,5 @@
 use crate::{
-    model::common::{Around, AxisDirection},
+    model::common::{Around, AxisDirection, LaneDirection},
     util::matrix::{Matrix, MatrixIndex, MatrixShape},
 };
 use serde::{Deserialize, Serialize};
@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 pub type IntersectionIndex = MatrixIndex;
 pub type RoadIndex = MatrixIndex;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Board<I, R> {
     pub intersections: Matrix<I>,
     pub horizontal_roads: Matrix<R>,
@@ -81,6 +81,26 @@ impl<I, R> Board<I, R> {
                     .indices()
                     .zip(std::iter::repeat(Vertical).zip(self.vertical_roads.iter())),
             )
+    }
+
+    pub fn lane_to_intersection_index(
+        &self,
+        road_direction: AxisDirection,
+        road_index: RoadIndex,
+        lane_direction: LaneDirection,
+    ) -> MatrixIndex {
+        use AxisDirection::*;
+        use LaneDirection::*;
+        match lane_direction {
+            HighToLow => road_index,
+            LowToHigh => {
+                let (x, y) = road_index;
+                match road_direction {
+                    Vertical => (x + 1, y),
+                    Horizontal => (x, y + 1),
+                }
+            },
+        }
     }
 
     // pub fn random_intersection(&self) -> IntersectionIndex {
