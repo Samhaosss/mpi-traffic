@@ -37,21 +37,21 @@ pub struct ViewSettings {
         name = "view-road-color",
         long = "view-road-color",
         default_value = "666666",
-        parse(from_str = "piston_window::color::hex")
+        parse(from_str = piston_window::color::hex)
     )]
     pub road_color: Color,
     #[structopt(
         name = "view-road-sign-color",
         long = "view-road-sign-color",
         default_value = "ffffff",
-        parse(from_str = "piston_window::color::hex")
+        parse(from_str = piston_window::color::hex)
     )]
     pub road_sign_color: Color,
     #[structopt(
         name = "view-road-middle-separator-color",
         long = "view-road-middle-separator-color",
         default_value = "ffdb4d",
-        parse(from_str = "piston_window::color::hex")
+        parse(from_str = piston_window::color::hex)
     )]
     pub road_middle_separator_color: Color,
     #[structopt(
@@ -70,21 +70,21 @@ pub struct ViewSettings {
         name = "view-intersection-color",
         long = "view-intersection-color",
         default_value = "737373",
-        parse(from_str = "piston_window::color::hex")
+        parse(from_str = piston_window::color::hex)
     )]
     pub intersection_color: Color,
     #[structopt(
         name = "view-intersection-sign-color",
         long = "view-intersection-sign-color",
         default_value = "66ff33",
-        parse(from_str = "piston_window::color::hex")
+        parse(from_str = piston_window::color::hex)
     )]
     pub intersection_sign_color: Color,
     #[structopt(
         name = "view-car-color",
         long = "view-car-color",
         default_value = "ff0066",
-        parse(from_str = "piston_window::color::hex")
+        parse(from_str = piston_window::color::hex)
     )]
     pub car_color: Color,
     #[structopt(
@@ -509,7 +509,7 @@ impl View {
                     }),
                     g2d,
                 );
-            },
+            }
             stateful::car::Location::ChangingLane {
                 road_direction,
                 road_index,
@@ -521,10 +521,10 @@ impl View {
             } => {
                 let length = city.road_length(road_direction, road_index);
                 let x = -length / 2.0 + position;
-                let lane_changed_offset = lane_changed_proportion *
-                    city.lane_width *
-                    (to_lane_index - from_lane_index) as f64 *
-                    match lane_direction {
+                let lane_changed_offset = lane_changed_proportion
+                    * city.lane_width
+                    * (to_lane_index - from_lane_index) as f64
+                    * match lane_direction {
                         LaneDirection::HighToLow => 1.0,
                         LaneDirection::LowToHigh => -1.0,
                     };
@@ -550,7 +550,7 @@ impl View {
                     }),
                     g2d,
                 );
-            },
+            }
             stateful::car::Location::InIntersection {
                 intersection_index,
                 from_direction,
@@ -584,7 +584,8 @@ impl View {
                 let dy = to_y - from_y;
                 let x = dx * proportion + from_x;
                 let y = dy * proportion + from_y;
-                let turn_direction = from_direction.turn_back() // convert to driver's direction
+                let turn_direction = from_direction
+                    .turn_back() // convert to driver's direction
                     .should_turn(to_direction);
                 let origin_heading = self.car_heading_deg_on_road(
                     from_direction.axis_direction(),
@@ -598,7 +599,7 @@ impl View {
                         .rot_deg(heading),
                     g2d,
                 );
-            },
+            }
         }
     }
 
