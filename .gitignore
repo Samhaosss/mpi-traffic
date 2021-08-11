@@ -2,6 +2,9 @@
 /.vscode
 /.idea
 *.iml
-/Synchronize.sh
+/result
+.direnv
+.envrc
+/outputs
 /target
 **/*.rs.bk

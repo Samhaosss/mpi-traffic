@@ -1,7 +1,8 @@
 # MPI Traffic
 
-[![Build Status](https://travis-ci.com/linyinfeng/mpi-traffic.svg?branch=master)](https://travis-ci.com/linyinfeng/mpi-traffic)
-[![Coverage Status](https://coveralls.io/repos/github/linyinfeng/mpi-traffic/badge.svg?branch=master)](https://coveralls.io/github/linyinfeng/mpi-traffic?branch=master)
+[![CI](https://github.com/linyinfeng/mpi-traffic/workflows/CI/badge.svg)](https://github.com/linyinfeng/mpi-traffic/actions)
+[![Documentation](https://img.shields.io/badge/doc-master-blue.svg)](https://www.linyinfeng.com/mpi-traffic/mpi_traffic)
+
 
 Simple traffic simulation with MPI.
 
