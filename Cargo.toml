@@ -14,7 +14,7 @@ edition = "2018"
 [dependencies]
 piston_window = "0.118.0"
 log = "0.4.14"
-env_logger = "0.8.3"
+env_logger = "0.9.0"
 bitflags = "1.2.1"
 quick-error = "2.0.0"
 rand= "0.8.3"
