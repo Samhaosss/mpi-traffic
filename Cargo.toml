@@ -16,7 +16,7 @@ piston_window = "0.118.0"
 log = "0.4.14"
 env_logger = "0.8.3"
 bitflags = "1.2.1"
-quick-error = "2.0.0"
+quick-error = "2.0.1"
 rand= "0.8.3"
 structopt= "0.3.21"
 serde = { version = "1.0.125", features = ["derive"] }
